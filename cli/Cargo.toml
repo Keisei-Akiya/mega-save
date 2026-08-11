@@ -1,21 +1,25 @@
 [package]
-name = "mega-save-pornavhd"
+name = "mega-save"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "pornavhd.com post → recordplay HLS → yt-dlp → MEGA via mega-save-storage"
+description = "Site-specific video fetch → MEGA (single binary: x | pornavhd)"
 readme = "README.md"
 
 [[bin]]
-name = "mega-save-pornavhd"
+name = "mega-save"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
+futures-util.workspace = true
 regex.workspace = true
 url.workspace = true
 tracing.workspace = true

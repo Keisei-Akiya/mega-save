@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["storage", "x", "pornavhd"]
+members = ["storage", "cli"]
 
 [workspace.package]
 version = "0.1.0"

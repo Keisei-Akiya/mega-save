@@ -1,6 +1,6 @@
 //! Resolve public video mp4 URLs via fxtwitter / vxtwitter (no yt-dlp).
 
-use crate::url::StatusRef;
+use super::url::StatusRef;
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::Client;
 use serde_json::Value;

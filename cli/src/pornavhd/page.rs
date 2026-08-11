@@ -1,6 +1,6 @@
 //! Post + embed HTML helpers. Network via `curl_get` (effect).
 
-use crate::curl_get;
+use super::curl_get;
 use anyhow::{bail, Context, Result};
 use regex::Regex;
 use std::sync::OnceLock;
