@@ -14,11 +14,12 @@ pub struct StatusRef {
 fn status_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
+        // (?x) treats bare # as start-of-comment — escape \# in the class.
         Regex::new(
             r"(?ix)
             ^https?://(?:www\.)?(?:x\.com|twitter\.com|mobile\.twitter\.com)
             /(?P<user>[A-Za-z0-9_]+)/status(?:es)?/(?P<id>\d+)
-            (?:[/?#].*)?$
+            (?:[/?\#].*)?$
             ",
         )
         .expect("status regex")
