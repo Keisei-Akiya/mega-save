@@ -1,40 +1,50 @@
 # mega-save
 
-Site-specific **video fetch → MEGA (`rclone`)** tools.
-
-Monorepo layout (add a directory per site):
+Site-specific **video fetch → MEGA** tools.
 
 ```
 mega-save/
-  Cargo.toml          # workspace
-  scripts/env-build.sh
-  x/                  # X / Twitter (mega-save-x)
-  # pornavhd/         # future
-  # youtube/          # future
+  storage/     # mega-save-storage — MEGA ops repository (FP)
+  x/           # mega-save-x — X/Twitter fetch CLI
+  scripts/
 ```
 
-## Principles
+## Architecture
 
-- **Acquisition is site-specific** — not “everything via yt-dlp”
-- X: fxtwitter / vxtwitter → mp4 (**no yt-dlp**)
-- MEGA: always `rclone` (remote usually `mega:`)
-- Destination path is **required** (CLI `--remote`); no silent default upload path
+```
+site crate (x, …)  →  MegaRepository  →  Op/Program (pure)  →  rclone interpret (effect)
+```
 
-## Build (this VPS)
+- **Acquisition is site-specific** (X: fxtwitter, not yt-dlp)
+- **All MEGA mutations go through `storage`** — mkdir / upload / delete / move / purge
+- Destination path is always explicit (`--remote`)
 
-System `gcc` is not installed; use conda-forge compilers:
+## storage (`mega-save-storage`)
+
+| API | Meaning |
+|-----|---------|
+| `ensure_dir` | reachable + mkdir |
+| `upload_file` / `upload_and_verify` | copy + size check |
+| `delete_file` | deletefile |
+| `delete_dir` | rmdir (empty) |
+| `purge_dir` | purge (recursive) |
+| `move_path` | moveto |
+| `list_files` / `file_size` | lsl |
+
+See [`storage/README.md`](storage/README.md).
+
+## x (`mega-save-x`)
 
 ```bash
 source scripts/env-build.sh
-cargo build --release
+cargo build -p mega-save-x --release
+./target/release/mega-save-x 'https://x.com/USER/status/ID' -r mega:video/r18/0
 ```
 
-Binaries land in `target/release/` (e.g. `mega-save-x`).
-
-## X crate
-
-See [`x/README.md`](x/README.md).
+## Build (this VPS)
 
 ```bash
-./target/release/mega-save-x 'https://x.com/user/status/ID' -r mega:video/r18/0
+source scripts/env-build.sh   # conda-forge gcc when system cc missing
+cargo test
+cargo build --release
 ```

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["x"]
+members = ["storage", "x"]
 # Future site crates: members += ["pornavhd", ...]
 
 [workspace.package]
@@ -22,3 +22,5 @@ regex = "1"
 url = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2"
+mega-save-storage = { path = "storage" }

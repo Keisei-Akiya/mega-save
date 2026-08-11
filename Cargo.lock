@@ -596,12 +596,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mega-save-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "mega-save-x"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
  "futures-util",
+ "mega-save-storage",
  "regex",
  "reqwest",
  "serde",
