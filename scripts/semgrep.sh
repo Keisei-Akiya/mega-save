@@ -10,7 +10,7 @@ if ! command -v semgrep >/dev/null 2>&1; then
   exit 127
 fi
 
-TARGETS=("${ROOT}/storage" "${ROOT}/x")
+TARGETS=("${ROOT}/storage" "${ROOT}/x" "${ROOT}/pornavhd")
 JSON=$(mktemp)
 trap 'rm -f "$JSON"' EXIT
 

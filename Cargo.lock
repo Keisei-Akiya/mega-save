@@ -596,6 +596,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mega-save-pornavhd"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "mega-save-storage",
+ "regex",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
 name = "mega-save-storage"
 version = "0.1.0"
 dependencies = [

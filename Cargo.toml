@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["storage", "x"]
-# Future site crates: members += ["pornavhd", ...]
+members = ["storage", "x", "pornavhd"]
 
 [workspace.package]
 version = "0.1.0"
