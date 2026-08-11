@@ -1,0 +1,14 @@
+/target/
+**/*.rs.bk
+.DS_Store
+*.swp
+.env
+.env.*
+!.env.example
+/tmp/
+*.mp4
+*.part
+.idea/
+.vscode/
+# local machine linker overrides (optional)
+.cargo/config.local.toml
