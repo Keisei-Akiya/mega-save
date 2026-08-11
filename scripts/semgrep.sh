@@ -10,7 +10,7 @@ if ! command -v semgrep >/dev/null 2>&1; then
   exit 127
 fi
 
-TARGETS=("${ROOT}/storage" "${ROOT}/x" "${ROOT}/pornavhd")
+TARGETS=("${ROOT}/storage" "${ROOT}/cli")
 JSON=$(mktemp)
 trap 'rm -f "$JSON"' EXIT
 
@@ -23,7 +23,6 @@ semgrep \
   --output "$JSON" \
   "${TARGETS[@]}"
 
-# Count blocking findings via python (no jq required)
 python3 - "$JSON" <<'PY'
 import json, sys
 path = sys.argv[1]

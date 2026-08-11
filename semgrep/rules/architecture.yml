@@ -20,14 +20,14 @@ rules:
 
   - id: mega-save.site-no-tokio-process
     message: >-
-      Site crates must not use tokio::process except ytdlp.rs (HLS fetch tool boundary).
+      Site modules must not use tokio::process except ytdlp.rs / curl_get.rs.
       MEGA I/O belongs in mega-save-storage.
     languages: [rust]
     severity: ERROR
     paths:
       include:
-        - "**/x/**/*.rs"
-        - "**/pornavhd/**/*.rs"
+        - "**/cli/src/x/**/*.rs"
+        - "**/cli/src/pornavhd/**/*.rs"
       exclude:
         - "**/target/**"
         - "**/semgrep/**"
@@ -37,13 +37,13 @@ rules:
 
   - id: mega-save.site-no-std-process-command
     message: >-
-      Site crates must not use std::process::Command. MEGA I/O belongs in mega-save-storage.
+      Site modules must not use std::process::Command. MEGA I/O belongs in mega-save-storage.
     languages: [rust]
     severity: ERROR
     paths:
       include:
-        - "**/x/**/*.rs"
-        - "**/pornavhd/**/*.rs"
+        - "**/cli/src/x/**/*.rs"
+        - "**/cli/src/pornavhd/**/*.rs"
       exclude:
         - "**/target/**"
         - "**/semgrep/**"
@@ -56,16 +56,16 @@ rules:
 
   - id: mega-save.site-no-low-level-storage-interpret
     message: >-
-      Site crates should call MegaRepository, not interpret/run_program directly.
+      Site modules should call MegaRepository, not interpret/run_program directly.
     languages: [rust]
     severity: ERROR
     paths:
       include:
-        - "**/x/**/*.rs"
-        - "**/pornavhd/**/*.rs"
+        - "**/cli/src/**/*.rs"
       exclude:
         - "**/target/**"
         - "**/semgrep/**"
+        - "**/storage/**"
     pattern-either:
       - pattern: mega_save_storage::interpret(...)
       - pattern: mega_save_storage::run_program(...)
@@ -74,13 +74,12 @@ rules:
 
   - id: mega-save.site-no-mod-rclone
     message: >-
-      Do not reintroduce a local rclone module in site crates.
+      Do not reintroduce a local rclone module in the CLI.
     languages: [rust]
     severity: ERROR
     paths:
       include:
-        - "**/x/**/*.rs"
-        - "**/pornavhd/**/*.rs"
+        - "**/cli/src/**/*.rs"
       exclude:
         - "**/semgrep/**"
     pattern-either:

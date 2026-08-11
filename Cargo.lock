@@ -596,32 +596,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mega-save-pornavhd"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "mega-save-storage",
- "regex",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "mega-save-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "mega-save-x"
+name = "mega-save"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -637,6 +612,16 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "mega-save-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

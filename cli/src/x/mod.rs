@@ -1,4 +1,4 @@
-//! mega-save-x: public X video → MEGA via fxtwitter/vxtwitter + storage repository.
+//! X / Twitter site command.
 
 mod download;
 mod fetch;
@@ -8,67 +8,43 @@ use anyhow::{bail, Context, Result};
 use clap::Parser;
 use mega_save_storage::{MegaRepository, Rclone, RemotePath};
 use std::path::PathBuf;
-use tracing::{info, Level};
-use tracing_subscriber::EnvFilter;
+use tracing::info;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "mega-save-x",
-    about = "Download public X/Twitter video (fxtwitter/vxtwitter) and upload to MEGA. No yt-dlp.",
-    version
-)]
-struct Cli {
+pub struct Args {
     /// X/Twitter status URL or bare numeric status id
-    url: String,
+    pub url: String,
 
     /// Destination remote path, e.g. mega:video/r18/0
     #[arg(short, long, env = "MEGA_SAVE_REMOTE")]
-    remote: String,
+    pub remote: String,
 
     /// Local/remote basename (default: {user}_{id}.mp4 or {id}.mp4)
     #[arg(long)]
-    name: Option<String>,
+    pub name: Option<String>,
 
     /// Keep local temp file after successful upload
     #[arg(long)]
-    keep_temp: bool,
+    pub keep_temp: bool,
 
     /// Resolve video URL only; skip download and upload
     #[arg(long)]
-    dry_run: bool,
+    pub dry_run: bool,
 
     /// rclone binary name or path
     #[arg(long, default_value = "rclone", env = "RCLONE_BIN")]
-    rclone: String,
+    pub rclone: String,
 
     /// Which video when multiple (0-based). Default: all
     #[arg(long)]
-    index: Option<usize>,
+    pub index: Option<usize>,
 
     /// Work directory parent (default: system temp)
     #[arg(long)]
-    workdir: Option<PathBuf>,
+    pub workdir: Option<PathBuf>,
 }
 
-#[tokio::main]
-async fn main() {
-    if let Err(e) = run().await {
-        eprintln!("error: {e:#}");
-        std::process::exit(1);
-    }
-}
-
-async fn run() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(Level::INFO.into())
-                .from_env_lossy(),
-        )
-        .with_writer(std::io::stderr)
-        .init();
-
-    let cli = Cli::parse();
+pub async fn run(cli: Args) -> Result<()> {
     let dest = RemotePath::parse(&cli.remote).map_err(|e| anyhow::anyhow!(e))?;
     let status = url::parse_status_input(&cli.url)?;
     info!(id = %status.id, user = ?status.user, remote = %dest, "start");

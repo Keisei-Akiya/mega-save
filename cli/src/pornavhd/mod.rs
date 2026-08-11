@@ -1,4 +1,4 @@
-//! mega-save-pornavhd: pornavhd post → recordplay HLS → yt-dlp → MEGA.
+//! pornavhd.com site command.
 
 mod curl_get;
 mod packer;
@@ -10,75 +10,51 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use mega_save_storage::{MegaRepository, Rclone, RemotePath};
 use std::path::PathBuf;
-use tracing::{info, Level};
-use tracing_subscriber::EnvFilter;
+use tracing::info;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "mega-save-pornavhd",
-    about = "pornavhd.com post → recordplay HLS → yt-dlp → MEGA. Do not pass post URL to yt-dlp directly.",
-    version
-)]
-struct Cli {
+pub struct Args {
     /// pornavhd post URL (…/YYYY/MM/DD/slug/)
-    url: String,
+    pub url: String,
 
     /// Destination remote path, e.g. mega:video/r18/1/raikun
     #[arg(short, long, env = "MEGA_SAVE_REMOTE")]
-    remote: String,
+    pub remote: String,
 
     /// Output basename (default: <slug>.mp4)
     #[arg(long)]
-    name: Option<String>,
+    pub name: Option<String>,
 
     /// Keep local temp file after upload
     #[arg(long)]
-    keep_temp: bool,
+    pub keep_temp: bool,
 
     /// Resolve HLS only; no download/upload
     #[arg(long)]
-    dry_run: bool,
+    pub dry_run: bool,
 
     /// rclone binary
     #[arg(long, default_value = "rclone", env = "RCLONE_BIN")]
-    rclone: String,
+    pub rclone: String,
 
     /// yt-dlp binary
     #[arg(long, default_value = "yt-dlp", env = "YT_DLP_BIN")]
-    yt_dlp: String,
+    pub yt_dlp: String,
 
     /// yt-dlp -f format
     #[arg(long, default_value = "bv*+ba/b")]
-    format: String,
+    pub format: String,
 
     /// yt-dlp --concurrent-fragments
     #[arg(long, default_value_t = 8)]
-    concurrent_fragments: u32,
+    pub concurrent_fragments: u32,
 
     /// Work directory parent (default: system temp)
     #[arg(long)]
-    workdir: Option<PathBuf>,
+    pub workdir: Option<PathBuf>,
 }
 
-#[tokio::main]
-async fn main() {
-    if let Err(e) = run().await {
-        eprintln!("error: {e:#}");
-        std::process::exit(1);
-    }
-}
-
-async fn run() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(Level::INFO.into())
-                .from_env_lossy(),
-        )
-        .with_writer(std::io::stderr)
-        .init();
-
-    let cli = Cli::parse();
+pub async fn run(cli: Args) -> Result<()> {
     url::reject_non_post(&cli.url)?;
     let post = url::parse_post_url(&cli.url)?;
     let dest = RemotePath::parse(&cli.remote).map_err(|e| anyhow::anyhow!(e))?;
