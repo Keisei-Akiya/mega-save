@@ -1,4 +1,4 @@
-use mega_save_storage::{MegaRepository, RemotePath, Rclone};
+use mega_save_storage::{MegaRepository, Rclone, RemotePath};
 use std::path::Path;
 
 #[tokio::main]
@@ -13,7 +13,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let a = base.join("hello.txt")?;
     let b = base.join("hello-moved.txt")?;
     repo.move_path(&a, &b).await?;
-    assert_eq!(repo.file_size(&base, "hello-moved.txt").await?, Some(expected));
+    assert_eq!(
+        repo.file_size(&base, "hello-moved.txt").await?,
+        Some(expected)
+    );
     assert_eq!(repo.file_size(&base, "hello.txt").await?, None);
     repo.delete_file(&b).await?;
     repo.purge_dir(&base).await?;

@@ -5,18 +5,23 @@ Site-specific **video fetch → MEGA** tools.
 ```
 mega-save/
   storage/     # mega-save-storage — MEGA ops repository (FP)
-  x/           # mega-save-x — X/Twitter fetch CLI
+  x/           # mega-save-x — X/Twitter
+  pornavhd/    # mega-save-pornavhd — pornavhd.com
   scripts/
+  semgrep/
 ```
 
 ## Architecture
 
 ```
-site crate (x, …)  →  MegaRepository  →  Op/Program (pure)  →  rclone interpret (effect)
+site crate (x | pornavhd | …)
+  → fetch (site-specific)
+  → MegaRepository → Op/Program (pure) → rclone interpret (effect)
 ```
 
-- **Acquisition is site-specific** (X: fxtwitter, not yt-dlp)
-- **All MEGA mutations go through `storage`** — mkdir / upload / delete / move / purge
+- **Acquisition is site-specific** (X: fxtwitter; pornavhd: embed packer + yt-dlp)
+- **All MEGA mutations go through `storage`**
+- **Process spawn:** rclone only in `storage/src/rclone.rs`; yt-dlp only in `**/ytdlp.rs`; HTML curl in `**/curl_get.rs`
 - Destination path is always explicit (`--remote`)
 
 ## storage (`mega-save-storage`)
@@ -31,41 +36,40 @@ site crate (x, …)  →  MegaRepository  →  Op/Program (pure)  →  rclone in
 | `move_path` | moveto |
 | `list_files` / `file_size` | lsl |
 
-See [`storage/README.md`](storage/README.md).
-
-## x (`mega-save-x`)
+## Site CLIs
 
 ```bash
-source scripts/env-build.sh
-cargo build -p mega-save-x --release
+# X
 ./target/release/mega-save-x 'https://x.com/USER/status/ID' -r mega:video/r18/0
+
+# pornavhd
+./target/release/mega-save-pornavhd \
+  'https://pornavhd.com/YYYY/MM/DD/slug/' \
+  -r mega:video/r18/1/raikun
 ```
 
-## Architecture lint (Semgrep)
+## Quality gates
 
-責務境界を Semgrep で固定する（`semgrep/rules/architecture.yml`）。
-
-| ルール（要約） | 守ること |
-|----------------|----------|
-| no rclone `Command::new` outside `storage/src/rclone.rs` | I/O 境界は interpret のみ |
-| site (`x/**`) で `tokio::process` / `std::process::Command` 禁止 | MEGA は Repository 経由 |
-| site から `interpret` / `run_program` 直接禁止 | Facade = `MegaRepository` |
-| `path` / `op` / `error` は process 禁止 | 純粋層 |
-| `repository.rs` は `Command::new` 禁止 | 合成のみ |
+| Script | What |
+|--------|------|
+| `./scripts/fmt.sh` | `cargo fmt --all`（適用） |
+| `./scripts/clippy.sh` | `clippy -D warnings` |
+| `./scripts/semgrep.sh` | 責務境界 |
+| `./scripts/semgrep-test.sh` | fixture 自己テスト |
+| `./scripts/check.sh` | **fmt check → clippy → semgrep → test** |
 
 ```bash
-# install once: uv tool install semgrep
-./scripts/semgrep.sh          # 本番ツリー（違反で exit != 0）
-./scripts/semgrep-test.sh     # fixture が検出されることの自己テスト
+uv tool install semgrep   # once
+source scripts/env-build.sh
+./scripts/check.sh
 ```
 
-CI: `.github/workflows/ci.yml` で `scripts/semgrep.sh` を実行。
+CI (`.github/workflows/ci.yml`): **fmt / clippy / semgrep / test** を並列 job。
 
 ## Build (this VPS)
 
 ```bash
-source scripts/env-build.sh   # conda-forge gcc when system cc missing
-./scripts/semgrep.sh
-cargo test
+source scripts/env-build.sh
+./scripts/check.sh
 cargo build --release
 ```

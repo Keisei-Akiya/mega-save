@@ -124,9 +124,7 @@ impl MegaRepository {
             .await?
         {
             Outcome::Size(s) => Ok(s),
-            other => Err(StorageError::Other(format!(
-                "expected Size, got {other:?}"
-            ))),
+            other => Err(StorageError::Other(format!("expected Size, got {other:?}"))),
         }
     }
 

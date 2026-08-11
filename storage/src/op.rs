@@ -13,7 +13,10 @@ pub enum Op {
     /// ディレクトリ作成（既存可）
     MkDir { dir: RemotePath },
     /// ローカルファイルをディレクトリへ copy（ファイル名は local の basename）
-    UploadFile { local: PathBuf, dest_dir: RemotePath },
+    UploadFile {
+        local: PathBuf,
+        dest_dir: RemotePath,
+    },
     /// 単一ファイル削除
     DeleteFile { path: RemotePath },
     /// 空ディレクトリ削除
