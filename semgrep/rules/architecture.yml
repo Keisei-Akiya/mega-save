@@ -1,0 +1,109 @@
+# Architecture boundaries for mega-save (FP storage repository).
+
+rules:
+  - id: mega-save.no-rclone-command-outside-interpreter
+    message: >-
+      Do not spawn the rclone binary outside storage/src/rclone.rs.
+      Use MegaRepository / Op + interpret instead.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/*.rs"
+      exclude:
+        - "**/storage/src/rclone.rs"
+        - "**/target/**"
+    pattern-either:
+      - pattern: Command::new("rclone")
+      - pattern: std::process::Command::new("rclone")
+      - pattern: tokio::process::Command::new("rclone")
+
+  - id: mega-save.site-no-tokio-process
+    message: >-
+      Site crate must not use tokio::process. MEGA I/O belongs in mega-save-storage.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/x/**/*.rs"
+      exclude:
+        - "**/target/**"
+        - "**/semgrep/**"
+    pattern: tokio::process::$ANY
+
+  - id: mega-save.site-no-std-process-command
+    message: >-
+      Site crate must not use std::process::Command. MEGA I/O belongs in mega-save-storage.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/x/**/*.rs"
+      exclude:
+        - "**/target/**"
+        - "**/semgrep/**"
+    pattern-either:
+      - pattern: std::process::Command
+      - pattern: std::process::Command::new($X)
+      - pattern: std::process::Command::$M
+
+  - id: mega-save.site-no-low-level-storage-interpret
+    message: >-
+      Site crates should call MegaRepository, not interpret/run_program directly.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/x/**/*.rs"
+      exclude:
+        - "**/target/**"
+        - "**/semgrep/**"
+    pattern-either:
+      - pattern: mega_save_storage::interpret(...)
+      - pattern: mega_save_storage::run_program(...)
+      - pattern: interpret($R, $O)
+      - pattern: run_program($R, $P)
+
+  - id: mega-save.site-no-mod-rclone
+    message: >-
+      Do not reintroduce a local rclone module in site crates.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/x/**/*.rs"
+      exclude:
+        - "**/semgrep/**"
+    pattern-either:
+      - pattern: mod rclone;
+      - pattern: mod rclone { ... }
+
+  - id: mega-save.pure-path-op-no-process
+    message: >-
+      storage path/op/error modules must stay pure (no process spawn).
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/storage/src/path.rs"
+        - "**/storage/src/op.rs"
+        - "**/storage/src/error.rs"
+    pattern-either:
+      - pattern: tokio::process::$X
+      - pattern: std::process::$X
+      - pattern: Command::new($X)
+      - pattern: std::process::Command::new($X)
+      - pattern: tokio::process::Command::new($X)
+
+  - id: mega-save.repository-no-direct-command
+    message: >-
+      MegaRepository must not spawn processes; compose Op only.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/storage/src/repository.rs"
+    pattern-either:
+      - pattern: Command::new($X)
+      - pattern: std::process::Command::new($X)
+      - pattern: tokio::process::Command::new($X)
