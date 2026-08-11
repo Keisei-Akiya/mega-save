@@ -140,10 +140,7 @@ mod tests {
         // p uses token "1" → hello. Packed form hand-built is hard; test extract only.
         let js = r#"var links={"hls2":"https://cdn.example/master.m3u8","hls4":"/stream/x/master.m3u8"};jwplayer("vplayer").setup({duration:"12.5"});"#;
         let l = extract_hls_links(js).unwrap();
-        assert_eq!(
-            l.hls2.as_deref(),
-            Some("https://cdn.example/master.m3u8")
-        );
+        assert_eq!(l.hls2.as_deref(), Some("https://cdn.example/master.m3u8"));
         let (best, tag) = l.best("https://recordplay.biz").unwrap();
         assert_eq!(tag, "hls2");
         assert!(best.starts_with("https://"));

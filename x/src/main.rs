@@ -6,7 +6,7 @@ mod url;
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use mega_save_storage::{MegaRepository, RemotePath, Rclone};
+use mega_save_storage::{MegaRepository, Rclone, RemotePath};
 use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber::EnvFilter;
@@ -105,7 +105,10 @@ async fn run() -> Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!(e))?;
 
-    let base_name = cli.name.clone().unwrap_or_else(|| default_basename(&status));
+    let base_name = cli
+        .name
+        .clone()
+        .unwrap_or_else(|| default_basename(&status));
 
     let tmp_root = if let Some(w) = &cli.workdir {
         std::fs::create_dir_all(w).ok();
@@ -138,13 +141,7 @@ async fn run() -> Result<()> {
         info!(%fname, bytes, "verified remote size");
         println!(
             "ok source={} file={} remote={}/{} bytes={} bitrate={} duration_s={:?}",
-            asset.source,
-            fname,
-            dest,
-            fname,
-            bytes,
-            asset.bitrate,
-            asset.duration_s
+            asset.source, fname, dest, fname, bytes, asset.bitrate, asset.duration_s
         );
 
         if cli.keep_temp {

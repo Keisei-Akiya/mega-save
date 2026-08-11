@@ -21,7 +21,7 @@ site crate (x | pornavhd | …)
 
 - **Acquisition is site-specific** (X: fxtwitter; pornavhd: embed packer + yt-dlp)
 - **All MEGA mutations go through `storage`**
-- **Process spawn:** rclone only in `storage/src/rclone.rs`; yt-dlp only in `**/ytdlp.rs`
+- **Process spawn:** rclone only in `storage/src/rclone.rs`; yt-dlp only in `**/ytdlp.rs`; HTML curl in `**/curl_get.rs`
 - Destination path is always explicit (`--remote`)
 
 ## storage (`mega-save-storage`)
@@ -48,19 +48,28 @@ site crate (x | pornavhd | …)
   -r mega:video/r18/1/raikun
 ```
 
-## Architecture lint (Semgrep)
+## Quality gates
+
+| Script | What |
+|--------|------|
+| `./scripts/fmt.sh` | `cargo fmt --all`（適用） |
+| `./scripts/clippy.sh` | `clippy -D warnings` |
+| `./scripts/semgrep.sh` | 責務境界 |
+| `./scripts/semgrep-test.sh` | fixture 自己テスト |
+| `./scripts/check.sh` | **fmt check → clippy → semgrep → test** |
 
 ```bash
 uv tool install semgrep   # once
-./scripts/semgrep.sh
-./scripts/semgrep-test.sh
+source scripts/env-build.sh
+./scripts/check.sh
 ```
+
+CI (`.github/workflows/ci.yml`): **fmt / clippy / semgrep / test** を並列 job。
 
 ## Build (this VPS)
 
 ```bash
 source scripts/env-build.sh
-./scripts/semgrep.sh
-cargo test --workspace
+./scripts/check.sh
 cargo build --release
 ```

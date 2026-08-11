@@ -8,7 +8,7 @@ mod ytdlp;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use mega_save_storage::{MegaRepository, RemotePath, Rclone};
+use mega_save_storage::{MegaRepository, Rclone, RemotePath};
 use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber::EnvFilter;
@@ -100,7 +100,11 @@ async fn run() -> Result<()> {
         return Ok(());
     }
 
-    let fname = url::ensure_mp4(cli.name.as_deref().unwrap_or(&url::default_filename(&post.slug)));
+    let fname = url::ensure_mp4(
+        cli.name
+            .as_deref()
+            .unwrap_or(&url::default_filename(&post.slug)),
+    );
 
     let tmp_root = if let Some(w) = &cli.workdir {
         std::fs::create_dir_all(w).ok();

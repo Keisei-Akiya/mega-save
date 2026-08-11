@@ -155,7 +155,10 @@ fn parse_vxtwitter(data: &Value) -> Result<Vec<VideoAsset>> {
                     out.push(VideoAsset {
                         mp4_url: u.to_string(),
                         bitrate: 0,
-                        duration_s: m.get("duration_millis").and_then(|d| d.as_f64()).map(|ms| ms / 1000.0),
+                        duration_s: m
+                            .get("duration_millis")
+                            .and_then(|d| d.as_f64())
+                            .map(|ms| ms / 1000.0),
                         source: "vxtwitter",
                         media_index: idx,
                     });

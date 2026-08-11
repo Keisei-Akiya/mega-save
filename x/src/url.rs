@@ -57,10 +57,13 @@ pub fn parse_status_input(input: &str) -> Result<StatusRef> {
         .name("id")
         .map(|m| m.as_str().to_string())
         .context("missing status id")?;
-    let user = caps.name("user").map(|m| m.as_str().to_string()).filter(|u| {
-        // path junk
-        !u.eq_ignore_ascii_case("i") && !u.eq_ignore_ascii_case("intent")
-    });
+    let user = caps
+        .name("user")
+        .map(|m| m.as_str().to_string())
+        .filter(|u| {
+            // path junk
+            !u.eq_ignore_ascii_case("i") && !u.eq_ignore_ascii_case("intent")
+        });
 
     if id.is_empty() {
         bail!("empty status id");
@@ -75,8 +78,8 @@ mod tests {
 
     #[test]
     fn parses_x_url() {
-        let r = parse_status_input("https://x.com/MadFrnrNpf/status/2071418683029676461?s=20")
-            .unwrap();
+        let r =
+            parse_status_input("https://x.com/MadFrnrNpf/status/2071418683029676461?s=20").unwrap();
         assert_eq!(r.id, "2071418683029676461");
         assert_eq!(r.user.as_deref(), Some("MadFrnrNpf"));
     }

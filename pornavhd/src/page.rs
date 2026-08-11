@@ -8,9 +8,7 @@ use tracing::info;
 
 fn embed_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r#"(?i)https?://[a-z0-9._-]+/e/[A-Za-z0-9]+"#).expect("embed re")
-    })
+    RE.get_or_init(|| Regex::new(r#"(?i)https?://[a-z0-9._-]+/e/[A-Za-z0-9]+"#).expect("embed re"))
 }
 
 pub async fn fetch_text(url: &str, referer: Option<&str>) -> Result<String> {
@@ -45,11 +43,7 @@ pub fn find_embed_url(post_html: &str) -> Result<String> {
 
 pub fn embed_origin(embed_url: &str) -> Result<String> {
     let u = url::Url::parse(embed_url).context("embed url")?;
-    let origin = format!(
-        "{}://{}",
-        u.scheme(),
-        u.host_str().context("embed host")?
-    );
+    let origin = format!("{}://{}", u.scheme(), u.host_str().context("embed host")?);
     Ok(origin)
 }
 

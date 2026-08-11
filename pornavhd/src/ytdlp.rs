@@ -25,12 +25,7 @@ impl Default for YtDlp {
 }
 
 /// Download HLS/master URL to `out` (exact path, including .mp4).
-pub async fn download_to(
-    ytdlp: &YtDlp,
-    media_url: &str,
-    referer: &str,
-    out: &Path,
-) -> Result<u64> {
+pub async fn download_to(ytdlp: &YtDlp, media_url: &str, referer: &str, out: &Path) -> Result<u64> {
     if let Some(parent) = out.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -80,24 +75,15 @@ pub async fn download_to(
     let final_path = if out.is_file() {
         out.to_path_buf()
     } else {
-        find_output(dir, name).await.with_context(|| {
-            format!(
-                "yt-dlp finished but output missing: {}",
-                out.display()
-            )
-        })?
+        find_output(dir, name)
+            .await
+            .with_context(|| format!("yt-dlp finished but output missing: {}", out.display()))?
     };
 
     if final_path != out {
         tokio::fs::rename(&final_path, out)
             .await
-            .with_context(|| {
-                format!(
-                    "rename {} → {}",
-                    final_path.display(),
-                    out.display()
-                )
-            })?;
+            .with_context(|| format!("rename {} → {}", final_path.display(), out.display()))?;
     }
 
     let meta = tokio::fs::metadata(out)
