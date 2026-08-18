@@ -1,6 +1,7 @@
 //! mega-save — single binary with site subcommands.
 
 mod pornavhd;
+mod wnacg;
 mod x;
 
 use clap::{Parser, Subcommand};
@@ -24,6 +25,8 @@ enum Commands {
     X(x::Args),
     /// pornavhd.com post → recordplay HLS → yt-dlp.
     Pornavhd(pornavhd::Args),
+    /// Public WNACG photo-slide work → one PDF → rclone remote.
+    Wnacg(wnacg::Args),
 }
 
 #[tokio::main]
@@ -41,6 +44,7 @@ async fn main() {
     let result = match cli.command {
         Commands::X(args) => x::run(args).await,
         Commands::Pornavhd(args) => pornavhd::run(args).await,
+        Commands::Wnacg(args) => wnacg::run(args).await,
     };
 
     if let Err(e) = result {

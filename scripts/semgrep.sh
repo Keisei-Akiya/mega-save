@@ -14,8 +14,11 @@ TARGETS=("${ROOT}/storage" "${ROOT}/cli")
 JSON=$(mktemp)
 trap 'rm -f "$JSON"' EXIT
 
-echo "+ semgrep → ${TARGETS[*]}"
+echo "+ semgrep (including untracked working-tree files) → ${TARGETS[*]}"
+# Architecture checks are a pre-commit gate too. Do not limit discovery to Git-tracked
+# files: new site modules are often untracked while this script is first run.
 semgrep \
+  --no-git-ignore \
   --config "${ROOT}/semgrep/rules/" \
   --metrics=off \
   --disable-version-check \
