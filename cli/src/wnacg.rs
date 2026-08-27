@@ -12,7 +12,7 @@ use regex::Regex;
 use reqwest::{header, Client, StatusCode};
 use std::cmp::Ordering;
 use std::fs::{self, File};
-use std::io::{BufWriter, Seek, Write};
+use std::io::{BufWriter, Cursor, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -23,6 +23,8 @@ const UA: &str = "mega-save/0.1 (+https://github.com/Keisei-Akiya/mega-save)";
 const MAX_IMAGES: usize = 1_000;
 const HTTP_MAX_ATTEMPTS: u32 = 4;
 const HTTP_RETRY_BASE_DELAY: Duration = Duration::from_secs(1);
+const MAX_IMAGE_PIXELS: u64 = 20_000_000;
+const MAX_TOTAL_PIXELS: u64 = 500_000_000;
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -108,12 +110,14 @@ pub async fn run(cli: Args) -> Result<()> {
         .with_context(|| format!("mkdir page cache {}", pages_dir.display()))?;
     let local = cache_dir.join(&filename);
 
-    let mut pages = Vec::with_capacity(images.len());
+    let mut pdf = PdfWriter::create(&local, images.len())?;
+    let mut pixel_budget = PixelBudget::new();
     for (index, image_url) in images.iter().enumerate() {
         let page_number = index + 1;
         let cache_path = cached_page_path(&pages_dir, page_number);
         if let Some(page) = load_cached_page(&cache_path, page_number)? {
-            pages.push(page);
+            pixel_budget.consume(page.width, page.height)?;
+            pdf.add_page(page)?;
             continue;
         }
         info!(page = page_number, total = images.len(), url = %image_url, "downloading public WNACG image");
@@ -124,9 +128,10 @@ pub async fn run(cli: Args) -> Result<()> {
             .with_context(|| format!("decode page {page_number} ({image_url})"))?;
         atomically_write(&cache_path, &bytes)
             .with_context(|| format!("cache page {page_number} at {}", cache_path.display()))?;
-        pages.push(page);
+        pixel_budget.consume(page.width, page.height)?;
+        pdf.add_page(page)?;
     }
-    write_pdf(&local, &pages)?;
+    pdf.finish()?;
     let bytes = std::fs::metadata(&local)
         .with_context(|| format!("stat {}", local.display()))?
         .len();
@@ -160,6 +165,7 @@ pub async fn run(cli: Args) -> Result<()> {
 fn build_http_client() -> Result<Client> {
     Client::builder()
         .user_agent(UA)
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(120))
         .connect_timeout(std::time::Duration::from_secs(30))
         .build()
@@ -299,6 +305,38 @@ fn trailing_json_comma_re() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r",\s*([\]}])").expect("trailing JSON comma regex"))
 }
 
+fn image_cdn_host_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"(?i)^img[0-9]+\.qy0\.ru$").expect("WNACG image CDN regex"))
+}
+
+/// Restrict image fetches to the public WNACG image CDN. The image list is
+/// untrusted page data, so do not allow it to select arbitrary network targets.
+fn validate_image_url(raw: &str) -> Result<Url> {
+    let url = Url::parse(raw).with_context(|| format!("invalid WNACG image URL: {raw}"))?;
+    if !matches!(url.scheme(), "http" | "https") {
+        bail!("WNACG image URL has an unsupported scheme");
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        bail!("WNACG image URL must not contain user credentials");
+    }
+    let host = url.host_str().unwrap_or_default();
+    if !image_cdn_host_re().is_match(host) {
+        bail!("WNACG image URL host is not an approved image CDN");
+    }
+    let standard_port = match url.scheme() {
+        "http" => 80,
+        "https" => 443,
+        _ => unreachable!("scheme checked above"),
+    };
+    if let Some(port) = url.port() {
+        if port != standard_port {
+            bail!("WNACG image URL uses a non-standard port");
+        }
+    }
+    Ok(url)
+}
+
 /// Parse WNACG's same-origin `mReader.initData` payload. `page_url` is already
 /// in reader order, so deliberately do not sort it.
 fn parse_item_image_urls(script: &str) -> Result<Vec<String>> {
@@ -321,10 +359,8 @@ fn parse_item_image_urls(script: &str) -> Result<Vec<String>> {
         let raw = page
             .as_str()
             .with_context(|| format!("WNACG page_url[{index}] is not a string"))?;
-        let url = Url::parse(raw).with_context(|| format!("invalid WNACG page_url[{index}]"))?;
-        if !matches!(url.scheme(), "http" | "https") {
-            bail!("WNACG page_url[{index}] has an unsupported scheme");
-        }
+        let url =
+            validate_image_url(raw).with_context(|| format!("invalid WNACG page_url[{index}]"))?;
         urls.push(url.to_string());
     }
     Ok(urls)
@@ -374,6 +410,9 @@ fn parse_image_urls(html: &str, page_url: &str) -> Result<Vec<String>> {
         let resolved = base
             .join(candidate)
             .with_context(|| format!("resolve image URL {candidate}"))?;
+        let Ok(resolved) = validate_image_url(resolved.as_str()) else {
+            continue;
+        };
         let path = resolved.path().to_ascii_lowercase();
         if !matches!(
             path.rsplit('.').next(),
@@ -648,7 +687,46 @@ struct JpegPage {
     jpeg: Vec<u8>,
 }
 
+struct PixelBudget {
+    used: u64,
+}
+
+impl PixelBudget {
+    fn new() -> Self {
+        Self { used: 0 }
+    }
+
+    fn consume(&mut self, width: u32, height: u32) -> Result<()> {
+        let pixels = validate_image_pixels(width, height)?;
+        let total = self
+            .used
+            .checked_add(pixels)
+            .context("total image pixel count overflow")?;
+        if total > MAX_TOTAL_PIXELS {
+            bail!("refusing to decode more than {MAX_TOTAL_PIXELS} total image pixels");
+        }
+        self.used = total;
+        Ok(())
+    }
+}
+
+fn validate_image_pixels(width: u32, height: u32) -> Result<u64> {
+    if width == 0 || height == 0 {
+        bail!("image has zero dimensions");
+    }
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels > MAX_IMAGE_PIXELS {
+        bail!("refusing to decode image with {pixels} pixels (maximum is {MAX_IMAGE_PIXELS})");
+    }
+    Ok(pixels)
+}
+
 fn jpeg_page(bytes: &[u8]) -> Result<JpegPage> {
+    let reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .context("identify supported image")?;
+    let (width, height) = reader.into_dimensions().context("read image dimensions")?;
+    validate_image_pixels(width, height)?;
     let image = image::load_from_memory(bytes).context("decode supported image")?;
     encode_jpeg(image)
 }
@@ -656,9 +734,7 @@ fn jpeg_page(bytes: &[u8]) -> Result<JpegPage> {
 fn encode_jpeg(image: DynamicImage) -> Result<JpegPage> {
     let rgb = image.to_rgb8();
     let (width, height) = rgb.dimensions();
-    if width == 0 || height == 0 {
-        bail!("image has zero dimensions");
-    }
+    validate_image_pixels(width, height)?;
     let mut jpeg = Vec::new();
     JpegEncoder::new_with_quality(&mut jpeg, 92)
         .encode_image(&DynamicImage::ImageRgb8(rgb))
@@ -670,70 +746,107 @@ fn encode_jpeg(image: DynamicImage) -> Result<JpegPage> {
     })
 }
 
-/// Write a minimal PDF with one JPEG-backed page per source image at 72 DPI.
-fn write_pdf(path: &Path, pages: &[JpegPage]) -> Result<()> {
-    if pages.is_empty() {
-        bail!("cannot write a PDF with zero pages");
+/// Sequential PDF writer that retains only offsets and one JPEG-backed page.
+struct PdfWriter {
+    writer: BufWriter<File>,
+    offsets: Vec<u64>,
+    page_count: usize,
+    pages_written: usize,
+}
+
+impl PdfWriter {
+    fn create(path: &Path, page_count: usize) -> Result<Self> {
+        if page_count == 0 {
+            bail!("cannot write a PDF with zero pages");
+        }
+        let file = File::create(path).with_context(|| format!("create {}", path.display()))?;
+        let mut pdf = Self {
+            writer: BufWriter::new(file),
+            offsets: Vec::with_capacity(2 + page_count * 3),
+            page_count,
+            pages_written: 0,
+        };
+        pdf.writer.write_all(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")?;
+        pdf.write_object(1, |writer| {
+            writer.write_all(b"<< /Type /Catalog /Pages 2 0 R >>")
+        })?;
+        pdf.write_object(2, |writer| {
+            write!(writer, "<< /Type /Pages /Kids [")?;
+            for index in 0..page_count {
+                write!(writer, "{} 0 R ", 3 + index * 3)?;
+            }
+            write!(writer, "] /Count {page_count} >>")
+        })?;
+        Ok(pdf)
     }
-    let mut objects: Vec<Vec<u8>> = vec![b"<< /Type /Catalog /Pages 2 0 R >>".to_vec()];
-    let mut kids = Vec::new();
-    for (index, page) in pages.iter().enumerate() {
+
+    fn add_page(&mut self, page: JpegPage) -> Result<()> {
+        if self.pages_written == self.page_count {
+            bail!("cannot add more PDF pages than declared");
+        }
+        let index = self.pages_written;
         let page_id = 3 + index * 3;
         let content_id = page_id + 1;
         let image_id = page_id + 2;
-        kids.push(format!("{page_id} 0 R"));
-        let content = format!(
-            "q\n{} 0 0 {} 0 0 cm\n/Im{} Do\nQ\n",
-            page.width,
-            page.height,
-            index + 1
-        );
-        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /XObject << /Im{} {} 0 R >> >> /Contents {} 0 R >>", page.width, page.height, index + 1, image_id, content_id).into_bytes());
-        objects.push(stream_object(content.as_bytes()));
-        let mut image = format!("<< /Type /XObject /Subtype /Image /Width {} /Height {} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n", page.width, page.height, page.jpeg.len()).into_bytes();
-        image.extend_from_slice(&page.jpeg);
-        image.extend_from_slice(b"\nendstream");
-        objects.push(image);
+        let image_name = index + 1;
+        let width = page.width;
+        let height = page.height;
+        self.write_object(page_id, |writer| {
+            write!(writer, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /XObject << /Im{image_name} {image_id} 0 R >> >> /Contents {content_id} 0 R >>")
+        })?;
+        let content = format!("q\n{width} 0 0 {height} 0 0 cm\n/Im{image_name} Do\nQ\n");
+        self.write_object(content_id, |writer| {
+            write!(
+                writer,
+                "<< /Length {} >>\nstream\n{}endstream",
+                content.len(),
+                content
+            )
+        })?;
+        self.write_object(image_id, |writer| {
+            write!(writer, "<< /Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n", page.jpeg.len())?;
+            writer.write_all(&page.jpeg)?;
+            writer.write_all(b"\nendstream")
+        })?;
+        self.pages_written += 1;
+        Ok(())
     }
-    objects.insert(
-        1,
-        format!(
-            "<< /Type /Pages /Kids [{}] /Count {} >>",
-            kids.join(" "),
-            pages.len()
-        )
-        .into_bytes(),
-    );
 
-    let file = File::create(path).with_context(|| format!("create {}", path.display()))?;
-    let mut writer = BufWriter::new(file);
-    writer.write_all(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")?;
-    let mut offsets = Vec::with_capacity(objects.len());
-    for (index, object) in objects.iter().enumerate() {
-        offsets.push(writer.stream_position()?);
-        writeln!(writer, "{} 0 obj", index + 1)?;
-        writer.write_all(object)?;
-        writer.write_all(b"\nendobj\n")?;
+    fn finish(mut self) -> Result<()> {
+        if self.pages_written != self.page_count {
+            bail!(
+                "PDF declared {} pages but received {}",
+                self.page_count,
+                self.pages_written
+            );
+        }
+        let xref = self.writer.stream_position()?;
+        writeln!(
+            self.writer,
+            "xref\n0 {}\n0000000000 65535 f ",
+            self.offsets.len() + 1
+        )?;
+        for offset in &self.offsets {
+            writeln!(self.writer, "{offset:010} 00000 n ")?;
+        }
+        writeln!(
+            self.writer,
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF",
+            self.offsets.len() + 1
+        )?;
+        self.writer.flush().context("flush PDF")
     }
-    let xref = writer.stream_position()?;
-    writeln!(writer, "xref\n0 {}\n0000000000 65535 f ", objects.len() + 1)?;
-    for offset in offsets {
-        writeln!(writer, "{:010} 00000 n ", offset)?;
-    }
-    writeln!(
-        writer,
-        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF",
-        objects.len() + 1,
-        xref
-    )?;
-    writer.flush().context("flush PDF")
-}
 
-fn stream_object(data: &[u8]) -> Vec<u8> {
-    let mut object = format!("<< /Length {} >>\nstream\n", data.len()).into_bytes();
-    object.extend_from_slice(data);
-    object.extend_from_slice(b"endstream");
-    object
+    fn write_object<F>(&mut self, id: usize, body: F) -> Result<()>
+    where
+        F: FnOnce(&mut BufWriter<File>) -> std::io::Result<()>,
+    {
+        self.offsets.push(self.writer.stream_position()?);
+        writeln!(self.writer, "{id} 0 obj")?;
+        body(&mut self.writer)?;
+        self.writer.write_all(b"\nendobj\n")?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -798,37 +911,79 @@ mod tests {
 
     #[test]
     fn preserves_item_json_page_order() {
-        let script = r#"mReader.initData({"page_url":["https://img.example/page-10.jpg","https://img.example/page-2.jpg","https://img.example/page-1.jpg",],"hidden":0});"#;
+        let script = r#"mReader.initData({"page_url":["https://img1.qy0.ru/page-10.jpg","https://img1.qy0.ru/page-2.jpg","https://img1.qy0.ru/page-1.jpg",],"hidden":0});"#;
         let urls = parse_item_image_urls(script).unwrap();
         assert_eq!(
             urls,
             vec![
-                "https://img.example/page-10.jpg",
-                "https://img.example/page-2.jpg",
-                "https://img.example/page-1.jpg",
+                "https://img1.qy0.ru/page-10.jpg",
+                "https://img1.qy0.ru/page-2.jpg",
+                "https://img1.qy0.ru/page-1.jpg",
             ]
         );
+    }
+
+    #[test]
+    fn accepts_only_standard_port_wnacg_image_cdn_urls() {
+        for url in [
+            "https://img1.qy0.ru/photos/page-1.jpg",
+            "http://img99.qy0.ru/photos/page-1.jpg",
+            "https://IMG2.QY0.RU/photos/page-1.jpg",
+        ] {
+            assert!(validate_image_url(url).is_ok(), "{url} should be accepted");
+        }
+        for url in [
+            "https://www.wnacg.com/photos/page-1.jpg",
+            "https://img1.qy0.ru.evil.example/page-1.jpg",
+            "https://img.qy0.ru/page-1.jpg",
+            "https://img1.qy0.ru:444/page-1.jpg",
+            "http://img1.qy0.ru:443/page-1.jpg",
+            "ftp://img1.qy0.ru/page-1.jpg",
+            "http://127.0.0.1/page-1.jpg",
+        ] {
+            assert!(validate_image_url(url).is_err(), "{url} should be rejected");
+        }
     }
 
     #[test]
     fn extracts_lazy_images_in_page_order_without_duplicates() {
         let html = r#"
           <img src="/static/logo.png">
-          <img data-original="https://img.example/pages/page-10.jpg">
-          <img data-original="https://img.example/pages/page-2.jpg" src="/placeholder.gif">
-          <img data-src="https://img.example/pages/page-1.jpg">
-          <img data-original="https://img.example/pages/page-2.jpg">
+          <img data-original="https://img1.qy0.ru/pages/page-10.jpg">
+          <img data-original="https://img1.qy0.ru/pages/page-2.jpg" src="/placeholder.gif">
+          <img data-src="https://img1.qy0.ru/pages/page-1.jpg">
+          <img data-original="https://img1.qy0.ru/pages/page-2.jpg">
+          <img data-original="http://127.0.0.1/secret.jpg">
         "#;
         let urls =
             parse_image_urls(html, "https://www.wnacg.com/photos-slide-aid-248039.html").unwrap();
         assert_eq!(
             urls,
             vec![
-                "https://img.example/pages/page-1.jpg",
-                "https://img.example/pages/page-2.jpg",
-                "https://img.example/pages/page-10.jpg",
+                "https://img1.qy0.ru/pages/page-1.jpg",
+                "https://img1.qy0.ru/pages/page-2.jpg",
+                "https://img1.qy0.ru/pages/page-10.jpg",
             ]
         );
+    }
+
+    #[test]
+    fn pixel_budget_allows_a_211_page_standard_work() {
+        let mut budget = PixelBudget::new();
+        for _ in 0..211 {
+            budget.consume(1_057, 1_500).unwrap();
+        }
+    }
+
+    #[test]
+    fn pixel_budget_rejects_oversized_single_or_total_images() {
+        assert!(PixelBudget::new().consume(20_001, 1_000).is_err());
+
+        let mut budget = PixelBudget::new();
+        for _ in 0..50 {
+            budget.consume(10_000, 1_000).unwrap();
+        }
+        assert!(budget.consume(10_000, 1_000).is_err());
     }
 
     #[test]
@@ -924,7 +1079,9 @@ mod tests {
         )))
         .unwrap();
         let temp = tempfile::NamedTempFile::new().unwrap();
-        write_pdf(temp.path(), &[page]).unwrap();
+        let mut pdf = PdfWriter::create(temp.path(), 1).unwrap();
+        pdf.add_page(page).unwrap();
+        pdf.finish().unwrap();
         let bytes = std::fs::read(temp.path()).unwrap();
         assert!(bytes.starts_with(b"%PDF-1.4"));
         assert!(bytes
