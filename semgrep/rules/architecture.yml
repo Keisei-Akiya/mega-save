@@ -28,6 +28,7 @@ rules:
       include:
         - "**/cli/src/x/**/*.rs"
         - "**/cli/src/pornavhd/**/*.rs"
+        - "**/cli/src/wnacg.rs"
       exclude:
         - "**/target/**"
         - "**/semgrep/**"
@@ -44,6 +45,7 @@ rules:
       include:
         - "**/cli/src/x/**/*.rs"
         - "**/cli/src/pornavhd/**/*.rs"
+        - "**/cli/src/wnacg.rs"
       exclude:
         - "**/target/**"
         - "**/semgrep/**"

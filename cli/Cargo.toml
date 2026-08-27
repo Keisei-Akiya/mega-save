@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Site-specific video fetch → MEGA (single binary: x | pornavhd)"
+description = "Site-specific fetch → MEGA (single binary: x | pornavhd | wnacg)"
 readme = "README.md"
 
 [[bin]]
@@ -25,3 +25,4 @@ url.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 mega-save-storage.workspace = true
+image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
