@@ -24,7 +24,10 @@ const MAX_IMAGES: usize = 1_000;
 const HTTP_MAX_ATTEMPTS: u32 = 4;
 const HTTP_RETRY_BASE_DELAY: Duration = Duration::from_secs(1);
 const MAX_IMAGE_PIXELS: u64 = 20_000_000;
-const MAX_TOTAL_PIXELS: u64 = 500_000_000;
+// A sequential writer retains only one decoded page, so this is an output-size
+// guard rather than a process-memory budget. Keep enough headroom for typical
+// long, high-resolution works while still bounding a hostile page list.
+const MAX_TOTAL_PIXELS: u64 = 1_200_000_000;
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -980,7 +983,7 @@ mod tests {
         assert!(PixelBudget::new().consume(20_001, 1_000).is_err());
 
         let mut budget = PixelBudget::new();
-        for _ in 0..50 {
+        for _ in 0..120 {
             budget.consume(10_000, 1_000).unwrap();
         }
         assert!(budget.consume(10_000, 1_000).is_err());
