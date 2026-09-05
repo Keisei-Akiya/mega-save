@@ -5,7 +5,7 @@
 ```
 mega-save/
   storage/     # mega-save-storage — MEGA repository (FP)
-  cli/         # mega-save — subcommands: x | pornavhd | wnacg
+  cli/         # mega-save — subcommands: x | pornavhd | wnacg | youtube
   scripts/
   semgrep/
 ```
@@ -31,6 +31,11 @@ mega-save pornavhd 'https://pornavhd.com/YYYY/MM/DD/slug/' -r mega:video/r18/1/r
 
 # Public WNACG photo-slide work → one PDF (title-derived safe basename unless --name is supplied)
 mega-save wnacg 'https://www.wnacg.com/photos-slide-aid-248039.html' -r mega:books/manga/r18/0
+
+# YouTube video → MP3 (single video even if the URL contains a playlist)
+mega-save youtube 'https://www.youtube.com/watch?v=VIDEO_ID' -r mega:music
+# Optional explicit filename; `.mp3` is added if omitted.
+mega-save youtube 'https://youtu.be/VIDEO_ID' -r mega:music --name 'track.mp3'
 
 mega-save --help
 mega-save x --help

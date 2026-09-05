@@ -3,6 +3,7 @@
 mod pornavhd;
 mod wnacg;
 mod x;
+mod youtube;
 
 use clap::{Parser, Subcommand};
 use tracing::Level;
@@ -27,6 +28,8 @@ enum Commands {
     Pornavhd(pornavhd::Args),
     /// Public WNACG photo-slide work → one PDF → rclone remote.
     Wnacg(wnacg::Args),
+    /// Public YouTube video → MP3 → rclone remote.
+    Youtube(youtube::Args),
 }
 
 #[tokio::main]
@@ -45,6 +48,7 @@ async fn main() {
         Commands::X(args) => x::run(args).await,
         Commands::Pornavhd(args) => pornavhd::run(args).await,
         Commands::Wnacg(args) => wnacg::run(args).await,
+        Commands::Youtube(args) => youtube::run(args).await,
     };
 
     if let Err(e) = result {
