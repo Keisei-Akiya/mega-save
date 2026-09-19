@@ -28,13 +28,16 @@ rules:
       include:
         - "**/cli/src/x/**/*.rs"
         - "**/cli/src/pornavhd/**/*.rs"
+        - "**/cli/src/spankbang/**/*.rs"
         - "**/cli/src/wnacg/**/*.rs"
       exclude:
         - "**/target/**"
-        - "**/semgrep/**"
         - "**/ytdlp.rs"
         - "**/curl_get.rs"
-    pattern: tokio::process::$ANY
+    pattern-either:
+      - pattern: tokio::process::Command
+      - pattern: tokio::process::Command::new($X)
+      - pattern: tokio::process::Command::$M
 
   - id: mega-save.site-no-std-process-command
     message: >-
@@ -45,10 +48,10 @@ rules:
       include:
         - "**/cli/src/x/**/*.rs"
         - "**/cli/src/pornavhd/**/*.rs"
+        - "**/cli/src/spankbang/**/*.rs"
         - "**/cli/src/wnacg/**/*.rs"
       exclude:
         - "**/target/**"
-        - "**/semgrep/**"
         - "**/ytdlp.rs"
         - "**/curl_get.rs"
     pattern-either:

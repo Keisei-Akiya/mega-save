@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Site-specific fetch → MEGA (single binary: x | pornavhd | wnacg)"
+description = "Site-specific fetch → MEGA (single binary: x | pornavhd | spankbang | wnacg)"
 readme = "README.md"
 
 [[bin]]

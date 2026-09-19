@@ -29,12 +29,18 @@ ids = {r.get("check_id", "") for r in results}
 print(f"fixture_findings={len(results)}")
 for r in results:
     print(f"  - {r.get('check_id')}")
-# Must catch rclone spawn outside interpreter
-if not any("no-rclone-command-outside-interpreter" in i for i in ids):
-    print("missing expected rule hit: no-rclone-command-outside-interpreter", file=sys.stderr)
-    sys.exit(1)
-if len(results) < 1:
-    print("expected at least 1 finding on fixtures", file=sys.stderr)
+# Must catch rclone spawn outside interpreter and process spawns in a site module.
+expected = [
+    "no-rclone-command-outside-interpreter",
+    "site-no-tokio-process",
+    "site-no-std-process-command",
+]
+for suffix in expected:
+    if not any(suffix in rule_id for rule_id in ids):
+        print(f"missing expected rule hit: {suffix}", file=sys.stderr)
+        sys.exit(1)
+if len(results) < len(expected):
+    print(f"expected at least {len(expected)} findings on fixtures", file=sys.stderr)
     sys.exit(1)
 print("fixtures correctly flagged")
 PY
