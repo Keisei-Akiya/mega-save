@@ -5,7 +5,7 @@
 ```
 mega-save/
   storage/     # mega-save-storage — MEGA repository (FP)
-  cli/         # mega-save — subcommands: x | pornavhd | wnacg
+  cli/         # mega-save — subcommands: x | pornavhd | spankbang | wnacg
   scripts/
   semgrep/
 ```
@@ -18,7 +18,7 @@ cargo build -p mega-save --release
 # → target/release/mega-save
 ```
 
-Requires on `PATH` depending on site: `rclone` (+ configured destination remote), and for pornavhd also `curl`, `yt-dlp`, `ffmpeg`.
+Requires on `PATH` depending on site: `rclone` (+ configured destination remote), and for pornavhd and SpankBang also `curl`, `yt-dlp`, `ffmpeg`.
 
 ## Usage
 
@@ -28,6 +28,9 @@ mega-save x 'https://x.com/USER/status/ID' -r mega:video/r18/0
 
 # pornavhd.com
 mega-save pornavhd 'https://pornavhd.com/YYYY/MM/DD/slug/' -r mega:video/r18/1/raikun
+
+# SpankBang (synthetic URL shown)
+mega-save spankbang 'https://spankbang.com/abc12/video/synthetic-example' -r mega:video/example
 
 # Public WNACG photo-slide work → one PDF (title-derived safe basename unless --name is supplied)
 mega-save wnacg 'https://www.wnacg.com/photos-slide-aid-248039.html' -r mega:books/manga/r18/0
@@ -41,7 +44,7 @@ mega-save pornavhd --dry-run 'https://pornavhd.com/.../' -r mega:video/r18/0
 
 ```
 mega-save <site>
-  → site module (cli/src/x | cli/src/pornavhd | cli/src/wnacg.rs)
+  → site module (cli/src/x | cli/src/pornavhd | cli/src/spankbang | cli/src/wnacg)
   → MegaRepository → Op/Program (pure) → rclone interpret (effect)
 ```
 
@@ -49,7 +52,8 @@ mega-save <site>
 |-------|------|
 | `cli/src/x` | fxtwitter/vxtwitter → mp4 |
 | `cli/src/pornavhd` | embed packer → HLS → yt-dlp |
-| `cli/src/wnacg.rs` | public photo-slide → ordered images → PDF |
+| `cli/src/spankbang` | site HTML / reader fallback → allowlisted MP4 → yt-dlp |
+| `cli/src/wnacg` | public photo-slide → ordered images → PDF |
 | `storage` | mkdir / upload / delete / move / purge |
 
 Process spawn boundaries:

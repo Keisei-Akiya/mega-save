@@ -1,6 +1,7 @@
 //! mega-save — single binary with site subcommands.
 
 mod pornavhd;
+mod spankbang;
 mod wnacg;
 mod x;
 
@@ -25,6 +26,8 @@ enum Commands {
     X(x::Args),
     /// pornavhd.com post → recordplay HLS → yt-dlp.
     Pornavhd(pornavhd::Args),
+    /// SpankBang video page → direct MP4 → yt-dlp.
+    Spankbang(spankbang::Args),
     /// Public WNACG photo-slide work → one PDF → rclone remote.
     Wnacg(wnacg::Args),
 }
@@ -44,6 +47,7 @@ async fn main() {
     let result = match cli.command {
         Commands::X(args) => x::run(args).await,
         Commands::Pornavhd(args) => pornavhd::run(args).await,
+        Commands::Spankbang(args) => spankbang::run(args).await,
         Commands::Wnacg(args) => wnacg::run(args).await,
     };
 
